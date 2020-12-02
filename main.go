@@ -1,106 +1,3 @@
-//package main
-//
-//import (
-//	"fmt"
-//	"github.com/gorilla/mux"
-//	"github.com/jinzhu/gorm"
-//	"log"
-//	_ "github.com/jinzhu/gorm/dialects/mysql"
-//	"net/http"
-//)
-//
-//var db *gorm.DB
-//var err error
-//
-//
-//
-////SCHEMA
-//type User struct {
-//	ID 				int 			`json:"id"`
-//	Username 		string 			`json:"username"`
-//	Email 			string 			`json:"email"`
-//	Password 		string 			`json:"password"`
-//}
-//
-//type User_Balance struct {
-//	ID 						int					 	`json:"id"`
-//	User_ID 				int 					`json:"user_id"`
-//	Balance 				int 					`json:"balance"`
-//	Balance_Achieve 		int 					`json:"balance_achieve"`
-//}
-//
-//type User_Balance_History struct {
-//	ID 					int 	`json:"id"`
-//	User_Balance_ID 	int 	`json:"user_balance_id"`
-//	Balance_Before 		int 	`json:"balance_before"`
-//	Balance_After 		int 	`json:"balance_after"`
-//	Activity		 	string 	`json:"activity"`
-//	Type 				string 	`gorm:"type:enum('credit','debit')" json:"type"`
-//	IP 					string 	`json:"ip"`
-//	Location 			string 	`json:"location"`
-//	User_Agent 			string 	`json:"user_agent"`
-//	Author 				string 	`json:"author"`
-//}
-//
-//type Blance_Bank struct {
-//	ID 						int 					`json:"id"`
-//	Balance 				int 					`json:"balance"`
-//	Balance_Achieve 		int 					`json:"balance_achieve"`
-//	Code 					string 					`json:"code"`
-//	Enable 					bool 					`json:"enable"`
-//}
-//
-//type Blance_Bank_History struct {
-//	ID 					int 	`json:"id"`
-//	Balance_Bank_ID 	int 	`json:"balance_bank_id"`
-//	Balance_Before 		int 	`json:"balance_before"`
-//	Balance_After 		int 	`json:"balance_after"`
-//	Activity 			string	`json:"activity"`
-//	Type 				string 	`gorm:"type:enum('credit','debit')" json:"type"`
-//	IP 					string 	`json:"ip"`
-//	Location 			string 	`json:"location"`
-//	User_Agent 			string 	`json:"user_agent"`
-//	Author 				string 	`json:"author"`
-//}
-//
-//type Result struct {
-//	Code	int 		`json:"code"`
-//	Data	interface{} `json:"data"`
-//	Message string 		`json:"message"`
-//}
-//
-//func main()  {
-//	db, err := gorm.Open("mysql", "root:@/e-wallet?charset=utf8&parseTime=True")
-//
-//	if err != nil {
-//		log.Println("Connection Failed", err)
-//	}else{
-//		log.Println("Connection established")
-//	}
-//	//migrate the Schema
-//	db.AutoMigrate(&User{}, &User_Balance{}, &User_Balance_History{}, &Blance_Bank{}, &Blance_Bank_History{})
-//	db.Model(&User_Balance{}).AddForeignKey("user_id","users(id)","cascade","cascade")
-//	db.Model(&User_Balance_History{}).AddForeignKey("id","user_balances(id)","cascade","cascade")
-//	db.Model(&Blance_Bank_History{}).AddForeignKey("balance_bank_id","blance_banks(id)","cascade","cascade")
-//
-//	handleRequests()
-//}
-//
-//func handleRequests()  {
-//	log.Println("Start the development server at http://127.0.0.1:9999")
-//
-//	myRouter := mux.NewRouter().StrictSlash(true)
-//
-//	myRouter.HandleFunc("/", homePage)
-//
-//
-//	log.Fatal(http.ListenAndServe(":9999", myRouter))
-//}
-//
-//func homePage(w http.ResponseWriter, r *http.Request)  {
-//	fmt.Fprintf(w, "Welcome")
-//}
-
 package main
 
 import (
@@ -198,6 +95,8 @@ func HandleRequests()  {
 	myRouter := mux.NewRouter().StrictSlash(true)
 
 	myRouter.HandleFunc("/", HomePage)
+	myRouter.HandleFunc("/register", Register)
+	myRouter.HandleFunc("/login", Login)
 
 	myRouter.HandleFunc("/api/users", CreateUser).Methods("POST")
 	myRouter.HandleFunc("/api/users", GetUsers).Methods("GET")
@@ -235,6 +134,47 @@ func HandleRequests()  {
 
 func HomePage(w http.ResponseWriter, r *http.Request)  {
 	fmt.Fprintf(w, "Welcome!")
+}
+
+
+func Register(w http.ResponseWriter, r *http.Request)  {
+	payloads, _ := ioutil.ReadAll(r.Body)
+
+	var register User
+	json.Unmarshal(payloads, &register)
+
+	db.Create(&register)
+	res := Result{Code: 200, Message: "Success register"}
+	result, err := json.Marshal(res)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	w.Header().Set("Content-Type","application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(result)
+
+}
+
+func Login(w http.ResponseWriter, r *http.Request)  {
+	payloads, _ := ioutil.ReadAll(r.Body)
+
+	var login User
+	json.Unmarshal(payloads, &login)
+
+	db.Where("username=? AND password=?", &login.Username, &login.Password).Find(&login)
+
+	res := Result{Code: 200, Message: "Success login"}
+	results, err := json.Marshal(res)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	w.Header().Set("Content-Type","application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(results)
 }
 
 func CreateUser(w http.ResponseWriter, r *http.Request) {
