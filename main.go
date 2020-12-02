@@ -34,6 +34,12 @@ type TopUp_Balance struct {
 	TopUp 	int 	`json:"top_up"`
 }
 
+type Transfer_Balance struct {
+	ID 			int 	`json:"id"`
+	UserID 		int 	`json:"user_id"`
+	Transfer 	int	 	`json:"transfer"`
+}
+
 type UserBalanceHistory struct {
 	ID 					int 	`json:"id"`
 	User_Balance_ID 	int 	`json:"user_balance_id"`
@@ -86,6 +92,7 @@ func main() {
 	db.AutoMigrate(&User{})
 	db.AutoMigrate(&UserBalance{})
 	db.AutoMigrate(&TopUp_Balance{})
+	db.AutoMigrate(&Transfer_Balance{})
 	db.AutoMigrate(&UserBalanceHistory{})
 	db.AutoMigrate(&Blance_Bank{})
 	db.AutoMigrate(&BlanceBankHistory{})
@@ -93,6 +100,7 @@ func main() {
 	db.Model(&UserBalanceHistory{}).AddForeignKey("id","user_balances(id)","cascade","cascade")
 	db.Model(&BlanceBankHistory{}).AddForeignKey("balance_bank_id","blance_banks(id)","cascade","cascade")
 	db.Model(&TopUp_Balance{}).AddForeignKey("user_id","users(id)","cascade","cascade")
+	db.Model(&Transfer_Balance{}).AddForeignKey("user_id","users(id)","cascade","cascade")
 	HandleRequests()
 
 }
@@ -107,6 +115,7 @@ func HandleRequests()  {
 	myRouter.HandleFunc("/login", Login).Methods("POST")
 
 	myRouter.HandleFunc("/topup", TopUpBalance).Methods("POST")
+	myRouter.HandleFunc("/topup", TransferBalance).Methods("POST")
 
 	myRouter.HandleFunc("/api/users", CreateUser).Methods("POST")
 	myRouter.HandleFunc("/api/users", GetUsers).Methods("GET")
@@ -148,18 +157,6 @@ func HomePage(w http.ResponseWriter, r *http.Request)  {
 
 
 func TopUpBalance(w http.ResponseWriter, r *http.Request)  {
-	//vars := mux.Vars(r)
-	//UserID := vars["id"]
-	//
-	//payloads, _ := ioutil.ReadAll(r.Body)
-	//
-	//var userUpdate User
-	//json.Unmarshal(payloads, &userUpdate)
-	//
-	//var user User
-	//db.First(&user, UserID)
-	//db.Model(&user).Updates(userUpdate)
-
 	payloads, _ := ioutil.ReadAll(r.Body)
 	var topup TopUp_Balance
 	json.Unmarshal(payloads, &topup)
@@ -170,7 +167,7 @@ func TopUpBalance(w http.ResponseWriter, r *http.Request)  {
 
 	var userbalanceUpdate UserBalance
 	test := db.Where("user_id=?", userID).Find(&userbalanceUpdate)
-	if test.RowsAffected==0{
+	if test.RowsAffected==1{
 		updateBalance := UserBalance{UserId: userID, Balance: topupBalance, BalanceAchieve: 2}
 		db.Create(updateBalance)
 	}else {
@@ -187,6 +184,54 @@ func TopUpBalance(w http.ResponseWriter, r *http.Request)  {
 		Balance_After: balance_after,
 		Activity: "TopUp",
 		Type: "debit",
+		IP: "123.00.00",
+		Location: "Indonesia",
+		User_Agent: "Dana",
+		Author: "Test",
+	}
+	db.Create(&userbalancehistory)
+
+	res := Result{Code: 200, Message: "Success Topup"}
+	result, err := json.Marshal(res)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	w.Header().Set("Content-Type","application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(result)
+
+}
+
+func TransferBalance(w http.ResponseWriter, r *http.Request)  {
+	payloads, _ := ioutil.ReadAll(r.Body)
+	var transfer Transfer_Balance
+	json.Unmarshal(payloads, &transfer)
+	userID := transfer.UserID
+	transferBalance := transfer.Transfer
+	db.Create(&transfer)
+	balance_after := transferBalance
+
+	var userbalanceUpdate UserBalance
+	test := db.Where("user_id=?", userID).Find(&userbalanceUpdate)
+	if test.RowsAffected==1{
+		updateBalance := UserBalance{UserId: userID, Balance: transferBalance, BalanceAchieve: 2}
+		db.Create(updateBalance)
+	}else {
+		balance_after := userbalanceUpdate.Balance - transferBalance
+		balance_achieve := userbalanceUpdate.BalanceAchieve
+		updateBalance := UserBalance{UserId: userID, Balance: balance_after, BalanceAchieve: balance_achieve}
+		db.First(&userbalanceUpdate, userID)
+		db.Model(&userbalanceUpdate).Updates(updateBalance)
+	}
+
+	userbalancehistory := UserBalanceHistory{
+		User_Balance_ID: userbalanceUpdate.ID,
+		Balance_Before: userbalanceUpdate.Balance,
+		Balance_After: balance_after,
+		Activity: "Transfer",
+		Type: "credit",
 		IP: "123.00.00",
 		Location: "Indonesia",
 		User_Agent: "Dana",
